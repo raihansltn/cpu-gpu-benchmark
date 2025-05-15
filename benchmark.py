@@ -4,7 +4,7 @@ import torch
 
 VECTOR_SIZE = 1024
 BATCH_SIZE = 64
-NUM_ITERATIONS = 1
+NUM_ITERATIONS = 100
 
 
 def benchmark_cpu_nlp():
@@ -21,12 +21,17 @@ def benchmark_cpu_nlp():
     print(f"CPU Time: {duration:.4f} seconds for {NUM_ITERATIONS} iterations")
 
 def benchmark_gpu_nlp():
-    if not torch.cuda.is_available():
-        print("CUDA is not available. Skipping GPU benchmark.")
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+        gpu_type = torch.cuda.get_device_name(0)
+        print(f"\n--- GPU NLP Benchmark ({gpu_type}) ---")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+        print("\n--- GPU NLP Benchmark (Apple MPS) ---")
+    else:
+        print("\n--- No GPU (CUDA or MPS) available for NLP benchmark. Skipping. ---")
         return
 
-    print("\n--- GPU NLP Benchmark ---")
-    device = torch.device("cuda")
     dummy_input = torch.randn(BATCH_SIZE, VECTOR_SIZE, device=device)
     dummy_weight = torch.randn(VECTOR_SIZE, VECTOR_SIZE, device=device)
     dummy_bias = torch.randn(VECTOR_SIZE, device=device)
@@ -34,18 +39,22 @@ def benchmark_gpu_nlp():
     start_time = time.time()
     for _ in range(NUM_ITERATIONS):
         output = torch.matmul(dummy_input, dummy_weight) + dummy_bias
-    torch.cuda.synchronize()  # Ensure all GPU operations are finished
+        if device.type == 'cuda':
+            torch.cuda.synchronize()
+        elif device.type == 'mps':
+            torch.mps.synchronize()
     end_time = time.time()
     duration = end_time - start_time
     print(f"GPU Time: {duration:.4f} seconds for {NUM_ITERATIONS} iterations")
 
 def benchmark_cpu_visual():
     print("\n--- CPU Visual Processing Benchmark ---")
-    image = np.random.rand(BATCH_SIZE, 256, 256, 3).astype(np.float32)
-    kernel = np.random.rand(3, 3, 3, 3).astype(np.float32)
+    image = np.random.rand(BATCH_SIZE, 256, 256, 3).astype(np.float32) # Batch of RGB images
+    kernel = np.random.rand(3, 3, 3, 3).astype(np.float32) # Simple convolution kernel
 
     start_time = time.time()
     for _ in range(NUM_ITERATIONS):
+        # Simple manual convolution (very inefficient, for demonstration)
         output = np.zeros_like(image)
         for b in range(BATCH_SIZE):
             for c_out in range(3):
@@ -60,21 +69,30 @@ def benchmark_cpu_visual():
     print(f"CPU Time: {duration:.4f} seconds for {NUM_ITERATIONS} iterations (Manual Convolution)")
 
 def benchmark_gpu_visual():
-    if not torch.cuda.is_available():
-        print("CUDA is not available. Skipping GPU benchmark.")
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+        gpu_type = torch.cuda.get_device_name(0)
+        print(f"\n--- GPU Visual Processing Benchmark ({gpu_type}) ---")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+        print("\n--- GPU Visual Processing Benchmark (Apple MPS) ---")
+    else:
+        print("\n--- No GPU (CUDA or MPS) available for Visual Processing benchmark. Skipping. ---")
         return
 
-    print("\n--- GPU Visual Processing Benchmark ---")
-    device = torch.device("cuda")
-    image = torch.randn(BATCH_SIZE, 3, 256, 256, device=device)
-    kernel = torch.randn(3, 3, 3, 3, device=device)
+    device = torch.device(device)
+    image = torch.randn(BATCH_SIZE, 3, 256, 256, device=device) # Batch of RGB images (PyTorch format)
+    kernel = torch.randn(3, 3, 3, 3, device=device) # Convolution kernel
 
     import torch.nn.functional as F
 
     start_time = time.time()
     for _ in range(NUM_ITERATIONS):
         output = F.conv2d(image, kernel, padding=1)
-    torch.cuda.synchronize()
+        if device.type == 'cuda':
+            torch.cuda.synchronize()
+        elif device.type == 'mps':
+            torch.mps.synchronize()
     end_time = time.time()
     duration = end_time - start_time
     print(f"GPU Time: {duration:.4f} seconds for {NUM_ITERATIONS} iterations (PyTorch Conv2d)")
